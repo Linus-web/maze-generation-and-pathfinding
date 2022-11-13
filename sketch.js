@@ -15,11 +15,11 @@ let endCol, endRow;
 let bestPath = [];
 
 function setup() {
-  let tGrid = new Grid(50, 50);
+  let tGrid = new Grid(100, 100);
   grid = tGrid.grid;
   cols = grid.length;
   rows = grid[0].length;
-  w = 10;
+  w = 18;
   createCanvas(cols * w, rows * w);
   frameRate(60);
   startCell = grid[1][1];
@@ -48,12 +48,13 @@ function draw() {
   }
   if (doingMaze) {
     time1 = Date.now();
-    RandomWalls();
+    while (doingMaze) RandomWalls();
     time2 = Date.now();
     console.log(`it took ${time2 - time1} milliseconds to generate a maze`);
   } else if (doingAStar) {
     time3 = Date.now();
-      while(doingAStar)aStar();
+    while(doingAStar)
+    aStar();
     time4 = Date.now();
     if (bestPath.length > 0)
       console.log(
@@ -63,6 +64,8 @@ function draw() {
           bestPath.length
         } steps`
       );
+  } else {
+    noLoop();
   }
 }
 
@@ -187,7 +190,7 @@ function heuristic(a, b) {
   } else {
     y = a.row - b.row;
   }
-
+  return dist(a.col, a.row, b.col, b.row);
   return x + y;
 }
 
@@ -207,11 +210,31 @@ function aStar() {
       console.log("DONE");
       let temp = current;
       bestPath.push(temp);
-      while (temp.parent) {
-        bestPath.push(temp.parent);
-        temp = temp.parent;
+      let tempParent;
+      let startNeighbour = false;
+      while (!startNeighbour) {
+        let tempCount = Infinity;
+
+        for (let i = 0; i < temp.neighbours.length; i++) {
+          for (let j = 0; j < temp.neighbours.length; j++) {
+            if (temp.neighbours[j].start) {
+              startNeighbour = true;
+            }
+          }
+
+          if (
+            temp.neighbours[i].gScore != 0 &&
+            temp.neighbours[i].gScore < tempCount &&
+            !temp.neighbours[i].isBest
+          ) {
+            tempParent = temp.neighbours[i];
+            tempCount = temp.neighbours[i].gScore;
+          }
+        }
         temp.isBest = true;
+        temp = tempParent;
       }
+
       doingAStar = false;
       return;
     }
@@ -225,8 +248,19 @@ function aStar() {
     for (let i = 0; i < neighbours.length; i++) {
       let neighbour = neighbours[i];
 
-      if (!neighbour.isInClosedSet && !neighbour.isWall) {
-        tempGScore = current.gScore + 1;
+      if (!neighbour.isInClosedSet) {
+        if (
+          (neighbour.col == current.col + 1 &&
+            neighbour.row == current.row + 1) ||
+          (neighbour.col == current.col - 1 &&
+            neighbour.row == current.row + 1) ||
+          (neighbour.col == current.col + 1 &&
+            neighbour.row == current.row - 1) ||
+          (neighbour.col == current.col - 1 && neighbour.row == current.row - 1)
+        )
+          tempGScore = current.gScore + 14;
+        else tempGScore = current.gScore + 10;
+
         if (neighbour.isInOpenSet) {
           if (tempGScore < neighbour.gScore) {
             neighbour.gScore = tempGScore;
@@ -237,9 +271,8 @@ function aStar() {
           neighbour.searched = true;
           openSet.push(neighbour);
         }
-        neighbour.h = heuristic(neighbour, grid[endCol][endRow]);
+        neighbour.h = heuristic(neighbour, grid[endCol][endRow]) * 10;
         neighbour.fScore = neighbour.gScore + neighbour.h;
-        neighbour.parent = current;
       }
     }
   }
@@ -270,51 +303,81 @@ class Cell {
     this.neighbours = [];
     this.searched = false;
     this.isBest = false;
-    this.parent = undefined;
   }
 
   checkNeighbourWalls() {
-    if (!this.walls[0] && grid[this.col][this.row - 1] && !this.isWall)
+    //up
+    if (
+      !this.walls[0] &&
+      grid[this.col][this.row - 1] &&
+      !grid[this.col][this.row - 1].isWall
+    ) {
       this.neighbours.push(grid[this.col][this.row - 1]);
-    if (!this.walls[1] && grid[this.col + 1] && !this.isWall)
+    }
+    //right
+    if (
+      !this.walls[1] &&
+      grid[this.col + 1] &&
+      !this.isWall &&
+      !grid[this.col + 1][this.row].isWall
+    ) {
       this.neighbours.push(grid[this.col + 1][this.row]);
-    if (!this.walls[2] && grid[this.col][this.row + 1] && !this.isWall)
+    }
+    //down
+    if (
+      !this.walls[2] &&
+      grid[this.col][this.row + 1] &&
+      !this.isWall &&
+      !grid[this.col][this.row + 1].isWall
+    ) {
       this.neighbours.push(grid[this.col][this.row + 1]);
-    if (!this.walls[3] && grid[this.col - 1] && !this.isWall)
+    }
+    //left
+    if (
+      !this.walls[3] &&
+      grid[this.col - 1] &&
+      !this.isWall &&
+      !grid[this.col - 1][this.row].isWall
+    ) {
       this.neighbours.push(grid[this.col - 1][this.row]);
+    }
 
+    //up-right
     if (
-      !this.walls[0] &&
-      !this.walls[1] &&
       grid[this.col][this.row - 1] &&
       grid[this.col + 1] &&
-      !this.isWall
-    )
+      !this.isWall &&
+      !grid[this.col + 1][this.row - 1].isWall
+    ) {
       this.neighbours.push(grid[this.col + 1][this.row - 1]);
+    }
+    //down-right
     if (
-      !this.walls[1] &&
-      !this.walls[2] &&
       grid[this.col + 1] &&
       grid[this.col][this.row + 1] &&
-      !this.isWall
-    )
+      !this.isWall &&
+      !grid[this.col + 1][this.row + 1].isWall
+    ) {
       this.neighbours.push(grid[this.col + 1][this.row + 1]);
+    }
+    //down-left
     if (
-      !this.walls[2] &&
-      !this.walls[3] &&
       grid[this.col - 1] &&
       grid[this.col][this.row + 1] &&
-      !this.isWall
-    )
+      !this.isWall &&
+      !grid[this.col - 1][this.row + 1].isWall
+    ) {
       this.neighbours.push(grid[this.col - 1][this.row + 1]);
+    }
+    //up-left
     if (
-      !this.walls[3] &&
-      !this.walls[0] &&
       grid[this.col][this.row - 1] &&
       grid[this.col - 1] &&
-      !this.isWall
-    )
+      !this.isWall &&
+      !grid[this.col - 1][this.row - 1].isWall
+    ) {
       this.neighbours.push(grid[this.col - 1][this.row - 1]);
+    }
   }
 
   show() {
